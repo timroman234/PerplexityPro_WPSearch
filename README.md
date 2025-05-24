@@ -1,7 +1,7 @@
 <img src="https://r2cdn.perplexity.ai/pplx-full-logo-primary-dark%402x.png" class="logo" width="120"/>
 
 # Perplexity Pro Search for WordPress
-
+v. 1.0
 Integrate the power of [Perplexity Pro](https://www.perplexity.ai/) into your WordPress site with this plugin. Deliver domain-specific, AI-powered answers directly in your search results using Perplexity’s Sonar API. Enhance your site’s search experience with advanced answer generation, related article citations, and easy customization—all with simple shortcodes.
 
 ---
