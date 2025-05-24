@@ -79,6 +79,7 @@ Add a basic search box to your sidebar or any widget area with:
 - **Plugin sends the query** to Perplexity’s Sonar API, filtered to your domain (if configured).
 - **AI-generated answer** is displayed, along with a list of related articles cited as references.
 
+- **Known image issues** there is currently an issue with the Article thumbnails in some cases. Working that out with Perplexity. Will update as soon as we can.
 ---
 
 ## Screenshots
