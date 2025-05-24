@@ -84,6 +84,7 @@ Add a basic search box to your sidebar or any widget area with:
 
 ## Screenshots
 
+<img src="https://github.com/user-attachments/assets/b2596b65-9c2b-408f-8d3a-aa3023f47571" alt="PP_WPSearch_2" width="50%">
 
 ![PP_WPSearch_2](https://github.com/user-attachments/assets/b2596b65-9c2b-408f-8d3a-aa3023f47571)
 ![PP_WPSearch_1](https://github.com/user-attachments/assets/37494736-a43b-4793-a0ee-363e9ce3fbe9)
