@@ -107,7 +107,7 @@ For issues or feature requests, please open an issue on this repository or conta
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT License. 
 
 ---
 
