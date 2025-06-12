@@ -135,6 +135,25 @@ function perplexity_search_ajax_handler() {
         return;
     }
 
+    // Clean summary/answer fields of markdown code blocks and linkify citations
+    $summary_fields = array('answer', 'summary', 'text', 'result');
+    foreach ($summary_fields as $field) {
+        if (isset($response[$field]) && is_string($response[$field])) {
+            $clean = remove_markdown_code_blocks($response[$field]);
+            $clean = linkify_citations($clean);
+            $response[$field] = $clean;
+        }
+    }
+    // Also process choices[0].message.content if present
+    if (isset($response['choices'][0]['message']['content']) && is_string($response['choices'][0]['message']['content'])) {
+        $content = $response['choices'][0]['message']['content'];
+        $content = remove_markdown_code_blocks($content);
+        $content = strip_all_markdown($content);
+        $citations = isset($response['citations']) && is_array($response['citations']) ? $response['citations'] : array();
+        $content = linkify_citations_with_urls($content, $citations);
+        $response['choices'][0]['message']['content'] = $content;
+    }
+
     wp_send_json_success($response);
 }
 add_action('wp_ajax_perplexity_search', 'perplexity_search_ajax_handler');
@@ -179,30 +198,19 @@ function perplexity_search_query_api($query, $api_key, $model = 'sonar', $temper
         'messages' => array(
             array(
                 'role' => 'system',
-                'content' => 'You are a search assistant for the Mexico News Daily website. Return your response as a valid JSON object with this exact structure, and nothing else before or after the JSON:
-{
-    "summary": "A clear and concise summary of the current events and news, without any citations or URLs",
-    "articles": [
-        {
-            "title": "The exact title of the article",
-            "url": "The full URL of the article",
-            "snippet": "A brief description of the article content",
-            "image_url": "The full URL of the article\'s featured image or thumbnail. REQUIRED - do not return null. If no image is available, return a relevant placeholder image URL.",
-            "date": "The publication date of the article in format: Month Day, Year"
-        }
-    ]
-}'
+                'content' => 'You are a search assistant for the Mexico News Daily website. Answer concisely and cite sources. Do NOT include code blocks that contain markdown formatting or the markdown code itself. Be sure to make the citation numbers linkable to the citation they pertain to in the response. Only answer if you know the answer. Do not hallucinate.'
             ),
             array(
                 'role' => 'user',
                 'content' => $query
             )
         ),
+        'return_images' => true,
         'temperature' => (float) $temperature,
         'top_p' => (float) $top_p,
-        'search_domain_filter' => array(PERPLEXITY_SEARCH_DOMAIN),
-        'max_tokens' => 1000,
-        'return_images' => true
+        'search_domain_filter' => array('mexiconewsdaily.com'),
+        'image_domain_filter' => array('mexiconewsdaily.com'),
+        'max_tokens' => 2000
     );
     
     // Prepare the request arguments
@@ -246,52 +254,62 @@ function perplexity_search_query_api($query, $api_key, $model = 'sonar', $temper
         return new WP_Error('json_error', 'Failed to parse API response: ' . json_last_error_msg());
     }
     
-    // Try to parse the content as JSON
-    $formatted_response = array(
-        'choices' => array(),
-        'citations' => array()
-    );
-    
-    if (isset($response_data['choices'][0]['message']['content'])) {
-        try {
-            $content = $response_data['choices'][0]['message']['content'];
-            // Try to parse the content as JSON
-            $parsed_content = json_decode($content, true);
-            
-            if (json_last_error() === JSON_ERROR_NONE && isset($parsed_content['summary'])) {
-                // If successfully parsed as JSON
-                $formatted_response['choices'] = array(
-                    array(
-                        'message' => array(
-                            'content' => $parsed_content['summary']
-                        )
-                    )
-                );
-                
-                if (isset($parsed_content['articles']) && is_array($parsed_content['articles'])) {
-                    $formatted_response['citations'] = $parsed_content['articles'];
-                }
-            } else {
-                // Fallback to text parsing if JSON parsing fails
-                $formatted_response['choices'] = array(
-                    array(
-                        'message' => array(
-                            'content' => $content
-                        )
-                    )
-                );
-            }
-        } catch (Exception $e) {
-            error_log('Error parsing Perplexity response content: ' . $e->getMessage());
-            $formatted_response['choices'] = array(
-                array(
-                    'message' => array(
-                        'content' => $content
-                    )
-                )
-            );
+    // Return the API response as-is for further processing in JS
+    return $response_data;
+}
+
+function remove_markdown_code_blocks($text) {
+    // Remove triple backtick code blocks
+    $text = preg_replace('/```[\s\S]*?```/', '', $text);
+    // Remove indented code blocks (4 spaces or a tab at line start)
+    $text = preg_replace('/^(    |\t).+$/m', '', $text);
+    return $text;
+}
+
+function strip_all_markdown($text) {
+    // Remove code blocks (already handled by remove_markdown_code_blocks, but just in case)
+    $text = preg_replace('/```[\s\S]*?```/', '', $text);
+    // Remove headers (lines starting with #)
+    $text = preg_replace('/^#+.*$/m', '', $text);
+    // Remove bold (**text** or __text__)
+    $text = preg_replace('/(\*\*|__)(.*?)\1/', '', $text);
+    // Remove italics (*text* or _text_)
+    $text = preg_replace('/(\*|_)(.*?)\1/', '', $text);
+    // Remove inline code `code`
+    $text = preg_replace('/`[^`]+`/', '', $text);
+    // Remove links [text](url)
+    $text = preg_replace('/\[[^\]]+\]\([^\)]+\)/', '', $text);
+    // Remove images ![alt](url)
+    $text = preg_replace('/!\[[^\]]*\]\([^\)]+\)/', '', $text);
+    // Remove blockquotes
+    $text = preg_replace('/^>.*$/m', '', $text);
+    // Remove horizontal rules
+    $text = preg_replace('/^-{3,}$/m', '', $text);
+    // Remove unordered/ordered list markers and their content (lines starting with -, *, +, or number.)
+    $text = preg_replace('/^\s*([-*+]\s.*|\d+\.\s.*)$/m', '', $text);
+    // Remove extra spaces and blank lines
+    $text = preg_replace('/^\s+|\s+$/m', '', $text);
+    $text = preg_replace('/\n{2,}/', "\n", $text);
+    return trim($text);
+}
+
+function linkify_citations($text) {
+    // Replace [N] with anchor links to #citation-N
+    return preg_replace_callback('/\[(\d+)\]/', function($matches) {
+        $num = $matches[1];
+        return '<a href="#citation-' . $num . '">[' . $num . ']</a>';
+    }, $text);
+}
+
+function linkify_citations_with_urls($text, $citations) {
+    return preg_replace_callback('/\[(\d+)\]/', function($matches) use ($citations) {
+        $num = (int)$matches[1];
+        $index = $num - 1;
+        if (isset($citations[$index])) {
+            $url = esc_url($citations[$index]);
+            return '<a class="pp_citation_link" href="' . $url . '" target="_blank" rel="noopener">[' . $num . ']</a>';
+        } else {
+            return $matches[0];
         }
-    }
-    
-    return $formatted_response;
+    }, $text);
 }
