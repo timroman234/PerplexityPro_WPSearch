@@ -17,6 +17,9 @@ Integrate the power of [Perplexity Pro](https://www.perplexity.ai/) into your Wo
 - **Admin Controls:** Set your API key and manage temperature controls from the WordPress Admin panel.
 - **Easy Integration:** Just add your API key and drop shortcodes where you want search functionality.
 
+- **Fixed Hallucinations:** Fixed Summary hallucinations.
+- **Added Citation Links:** Added citation number links to citation articles.
+
 ---
 
 ## Installation
